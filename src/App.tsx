@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { SearchBar } from '@/components/SearchBar';
 import { MovieCard } from '@/components/MovieCard';
 import { FilterSort } from '@/components/FilterSort';
@@ -19,6 +19,8 @@ function App() {
 
   // Fetch movies based on search query
   useEffect(() => {
+    let isMounted = true;
+
     const fetchMovies = async () => {
       setLoading(true);
       setError(null);
@@ -30,29 +32,43 @@ function App() {
         } else {
           results = await getPopularMovies();
         }
-        setMovies(results);
+        if (isMounted) {
+          setMovies(results);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch movies');
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Failed to fetch movies');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchMovies();
+    return () => {
+      isMounted = false;
+    };
   }, [debouncedSearch]);
 
-  // Sort movies
-  const sortedMovies = [...movies].sort((a, b) => {
-    switch (sortBy) {
-      case 'rating':
-        return b.vote_average - a.vote_average;
-      case 'release_date':
-        return new Date(b.release_date).getTime() - new Date(a.release_date).getTime();
-      case 'popularity':
-      default:
-        return b.popularity - a.popularity;
-    }
-  });
+  // Sort movies with memoization
+  const sortedMovies = useMemo(() => {
+    return [...movies].sort((a, b) => {
+      switch (sortBy) {
+        case 'rating':
+          return b.vote_average - a.vote_average;
+        case 'release_date': {
+          const dateA = a.release_date ? new Date(a.release_date).getTime() : 0;
+          const dateB = b.release_date ? new Date(b.release_date).getTime() : 0;
+          return dateB - dateA;
+        }
+        case 'popularity':
+        default:
+          return b.popularity - a.popularity;
+      }
+    });
+  }, [movies, sortBy]);
 
   return (
     <div className="min-h-screen p-4 md:p-8">
@@ -92,7 +108,7 @@ function App() {
         {error && (
           <div className="text-center py-20">
             <p className="text-red-400 text-lg">{error}</p>
-            <p className="text-gray-400 mt-2">Please check your API key in .env.local</p>
+            <p className="text-gray-400 mt-2">Please check your configuration</p>
           </div>
         )}
 

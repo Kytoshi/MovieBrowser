@@ -10,14 +10,24 @@ interface MovieCardProps {
 export function MovieCard({ movie, onClick }: MovieCardProps) {
   const posterUrl = getImageUrl(movie.poster_path, 'w500');
   const year = movie.release_date ? new Date(movie.release_date).getFullYear() : 'N/A';
-  const rating = movie.vote_average ? movie.vote_average.toFixed(1) : 'N/A';
+  const rating = movie.vote_average != null ? movie.vote_average.toFixed(1) : 'N/A';
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick(movie.id);
+    }
+  };
 
   return (
     <motion.div
+      role="button"
+      tabIndex={0}
       whileHover={{ scale: 1.05, y: -8 }}
       whileTap={{ scale: 0.98 }}
       transition={{ duration: 0.2 }}
       onClick={() => onClick(movie.id)}
+      onKeyDown={handleKeyDown}
       className="cursor-pointer group"
     >
       <div className="glass glass-hover rounded-lg overflow-hidden shadow-xl">
@@ -25,9 +35,12 @@ export function MovieCard({ movie, onClick }: MovieCardProps) {
         <div className="relative aspect-[2/3] overflow-hidden">
           <img
             src={posterUrl}
-            alt={movie.title}
+            alt={movie.title || 'Movie poster'}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
             loading="lazy"
+            onError={(e) => {
+              e.currentTarget.src = getImageUrl(null, 'w500');
+            }}
           />
           {/* Rating Badge */}
           <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm px-2 py-1 rounded-full flex items-center gap-1">
