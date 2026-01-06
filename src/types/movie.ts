@@ -64,3 +64,65 @@ export interface MovieSearchResponse {
 
 // Sort options for client-side filtering
 export type SortOption = 'popularity' | 'rating' | 'release_date';
+
+// Watch Providers (Streaming availability)
+export interface WatchProvider {
+  provider_id: number;
+  provider_name: string;
+  logo_path: string;
+  display_priority: number;
+}
+
+export interface WatchProviderRegion {
+  link?: string;
+  flatrate?: WatchProvider[];  // Streaming (Netflix, etc.)
+  rent?: WatchProvider[];      // Rent (Apple TV, etc.)
+  buy?: WatchProvider[];       // Buy (Amazon, etc.)
+}
+
+export interface WatchProviders {
+  id: number;
+  results: {
+    [countryCode: string]: WatchProviderRegion;
+  };
+}
+
+// Movie Videos (Trailers, etc.)
+export interface MovieVideo {
+  id: string;
+  key: string;           // YouTube video ID
+  site: string;          // "YouTube"
+  type: string;          // "Trailer", "Teaser", "Featurette", etc.
+  official: boolean;
+  name: string;
+  size: number;          // 360, 480, 720, 1080
+  published_at: string;
+}
+
+export interface MovieVideos {
+  id: number;
+  results: MovieVideo[];
+}
+
+// Movie Credits (Cast & Crew)
+export interface CastMember {
+  id: number;
+  name: string;
+  character: string;
+  profile_path: string | null;
+  order: number;
+}
+
+export interface CrewMember {
+  id: number;
+  name: string;
+  job: string;
+  department: string;
+  profile_path: string | null;
+}
+
+export interface MovieCredits {
+  id: number;
+  cast: CastMember[];
+  crew: CrewMember[];
+}

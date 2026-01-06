@@ -3,6 +3,7 @@
 ## ✅ Completed
 
 ### Project Setup
+
 - ✅ Vite + React + TypeScript initialized
 - ✅ Tailwind CSS v4 configured with custom theme
 - ✅ Path aliases (@/) configured in vite.config.ts and tsconfig
@@ -10,6 +11,7 @@
 - ✅ Git repository initialized
 
 ### Dependencies Installed
+
 - ✅ React 19 + TypeScript
 - ✅ Tailwind CSS + PostCSS + Autoprefixer
 - ✅ motion (for animations)
@@ -19,6 +21,7 @@
 - ✅ class-variance-authority
 
 ### Core Infrastructure
+
 - ✅ **src/types/movie.ts** - TypeScript interfaces for TMDB API data
 - ✅ **src/lib/utils.ts** - cn() helper for merging classNames
 - ✅ **src/services/tmdbApi.ts** - API service with searchMovies(), getPopularMovies(), getMovieDetails(), getImageUrl()
@@ -26,6 +29,7 @@
 - ✅ **.env.local** - Template for TMDB API key (needs user's key)
 
 ### shadcn/ui Components (src/components/ui/)
+
 - ✅ **button.tsx** - Button with variants (default, outline, ghost, etc.)
 - ✅ **card.tsx** - Card with Header, Content, Footer sections
 - ✅ **input.tsx** - Input field with focus states
@@ -34,6 +38,7 @@
 ## ⏳ Remaining Tasks
 
 ### Feature Components (Next Steps)
+
 - ⏳ **SearchBar.tsx** - Search input with debounce integration
 - ⏳ **MovieCard.tsx** - Movie card with glassmorphism design
 - ⏳ **FilterSort.tsx** - Filter/sort controls for movies
@@ -41,6 +46,7 @@
 - ⏳ **App.tsx** - Main app component to wire everything together
 
 ### User Actions Required
+
 1. Add TMDB API key to `.env.local`:
    ```
    VITE_TMDB_API_KEY=your_actual_api_key_here
