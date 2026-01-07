@@ -331,3 +331,28 @@ export async function discoverKDrama(page: number = 1): Promise<Movie[]> {
     throw new Error("Failed to discover K-Drama. Please try again.");
   }
 }
+
+/**
+ * Get latest released movies sorted by release date
+ * @param page - Page number for pagination
+ * @returns Array of recently released movies
+ */
+export async function getLatestMovies(page: number = 1): Promise<Movie[]> {
+  try {
+    // Get today's date and format for API
+    const today = new Date().toISOString().split("T")[0];
+    const response = await fetch(
+      `${BASE_URL}/discover/movie?api_key=${API_KEY}&page=${page}&sort_by=primary_release_date.desc&primary_release_date.lte=${today}&vote_count.gte=10&include_adult=false`
+    );
+
+    if (!response.ok) {
+      throw new Error(`TMDB API error: ${response.status}`);
+    }
+
+    const data: MovieSearchResponse = await response.json();
+    return data.results;
+  } catch (error) {
+    console.error("Error fetching latest movies:", error);
+    throw new Error("Failed to fetch latest movies. Please try again.");
+  }
+}
