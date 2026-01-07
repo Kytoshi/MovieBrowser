@@ -5,6 +5,7 @@ import type {
   WatchProviders,
   MovieVideos,
   MovieCredits,
+  Genre,
 } from "@/types/movie";
 
 // TMDB API Configuration
@@ -231,5 +232,102 @@ export async function getTrendingMovies(
   } catch (error) {
     console.error("Error fetching trending movies:", error);
     throw new Error("Failed to fetch trending movies. Please try again.");
+  }
+}
+
+/**
+ * Get list of movie genres
+ * @returns Array of genres with id and name
+ */
+export async function getGenres(): Promise<Genre[]> {
+  try {
+    const response = await fetch(
+      `${BASE_URL}/genre/movie/list?api_key=${API_KEY}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`TMDB API error: ${response.status}`);
+    }
+
+    const data: { genres: Genre[] } = await response.json();
+    return data.genres;
+  } catch (error) {
+    console.error("Error fetching genres:", error);
+    return [];
+  }
+}
+
+/**
+ * Discover movies by genre
+ * @param genreId - Genre ID to filter by
+ * @param page - Page number for pagination
+ * @returns Array of movies in the specified genre
+ */
+export async function discoverMoviesByGenre(
+  genreId: number,
+  page: number = 1
+): Promise<Movie[]> {
+  try {
+    const response = await fetch(
+      `${BASE_URL}/discover/movie?api_key=${API_KEY}&with_genres=${genreId}&page=${page}&sort_by=popularity.desc&include_adult=false`
+    );
+
+    if (!response.ok) {
+      throw new Error(`TMDB API error: ${response.status}`);
+    }
+
+    const data: MovieSearchResponse = await response.json();
+    return data.results;
+  } catch (error) {
+    console.error("Error discovering movies by genre:", error);
+    throw new Error("Failed to discover movies. Please try again.");
+  }
+}
+
+/**
+ * Discover Anime movies (Animation genre + Japanese origin)
+ * @param page - Page number for pagination
+ * @returns Array of anime movies
+ */
+export async function discoverAnime(page: number = 1): Promise<Movie[]> {
+  try {
+    // Genre 16 = Animation, with_origin_country = JP (Japan)
+    const response = await fetch(
+      `${BASE_URL}/discover/movie?api_key=${API_KEY}&with_genres=16&with_origin_country=JP&page=${page}&sort_by=popularity.desc&include_adult=false`
+    );
+
+    if (!response.ok) {
+      throw new Error(`TMDB API error: ${response.status}`);
+    }
+
+    const data: MovieSearchResponse = await response.json();
+    return data.results;
+  } catch (error) {
+    console.error("Error discovering anime:", error);
+    throw new Error("Failed to discover anime. Please try again.");
+  }
+}
+
+/**
+ * Discover K-Drama movies (Drama genre + Korean origin)
+ * @param page - Page number for pagination
+ * @returns Array of Korean drama movies
+ */
+export async function discoverKDrama(page: number = 1): Promise<Movie[]> {
+  try {
+    // Genre 18 = Drama, with_origin_country = KR (South Korea)
+    const response = await fetch(
+      `${BASE_URL}/discover/movie?api_key=${API_KEY}&with_genres=18&with_origin_country=KR&page=${page}&sort_by=popularity.desc&include_adult=false`
+    );
+
+    if (!response.ok) {
+      throw new Error(`TMDB API error: ${response.status}`);
+    }
+
+    const data: MovieSearchResponse = await response.json();
+    return data.results;
+  } catch (error) {
+    console.error("Error discovering K-Drama:", error);
+    throw new Error("Failed to discover K-Drama. Please try again.");
   }
 }

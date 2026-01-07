@@ -172,6 +172,16 @@
     background: var(--color-accent);
   }
 
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Hero carousel progress bar animation - slower than 6s slide for subtle effect */
   .progress-bar-fill {
     width: 0%;

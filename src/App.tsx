@@ -10,32 +10,58 @@ import {
   searchMovies,
   getPopularMovies,
   getTrendingMovies,
+  getGenres,
+  discoverMoviesByGenre,
+  discoverAnime,
+  discoverKDrama,
 } from "@/services/tmdbApi";
-import type { Movie, SortOption } from "@/types/movie";
+import type { Movie, SortOption, Genre } from "@/types/movie";
+
+// Special genre IDs for custom categories
+const SPECIAL_GENRES = {
+  ANIME: -1,
+  KDRAMA: -2,
+};
+
+// Filter out movies that are planned/rumored or missing essential data
+function filterReleasedMovies(movies: Movie[]): Movie[] {
+  const oneYearFromNow = new Date();
+  oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+
+  return movies.filter((movie) => {
+    // Must have a poster image
+    if (!movie.poster_path) return false;
+
+    // Must have a release date
+    if (!movie.release_date) return false;
+
+    // Release date must not be more than 1 year in the future
+    const releaseDate = new Date(movie.release_date);
+    return releaseDate <= oneYearFromNow;
+  });
+}
 
 // Separate component to avoid breaking Rules of Hooks
 function MovieCardWithAnimation({
   movie,
-  index,
   onClick,
 }: {
   movie: Movie;
-  index: number;
   onClick: (id: number) => void;
 }) {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const isInView = useInView(ref, { once: true, margin: "100px" });
 
   return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 50 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
-      transition={{ delay: (index % 6) * 0.1, duration: 0.5 }}
-      className="col-span-1"
-    >
-      <MovieCard movie={movie} onClick={onClick} />
-    </motion.div>
+    <div ref={ref} className="col-span-1">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: isInView ? 1 : 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <MovieCard movie={movie} onClick={onClick} />
+      </motion.div>
+    </div>
   );
 }
 
@@ -53,7 +79,11 @@ function App() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [selectedGenre, setSelectedGenre] = useState<number | null>(null);
+  const [genreDropdownOpen, setGenreDropdownOpen] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const genreDropdownRef = useRef<HTMLDivElement>(null);
 
   const debouncedSearch = useDebounce(searchQuery, 500);
 
@@ -66,12 +96,32 @@ function App() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Close genre dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (genreDropdownRef.current && !genreDropdownRef.current.contains(e.target as Node)) {
+        setGenreDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Listen for similar movie clicks from MovieDetail
+  useEffect(() => {
+    const handleOpenMovieDetail = (e: CustomEvent<number>) => {
+      setSelectedMovieId(e.detail);
+    };
+    window.addEventListener("openMovieDetail", handleOpenMovieDetail as EventListener);
+    return () => window.removeEventListener("openMovieDetail", handleOpenMovieDetail as EventListener);
+  }, []);
+
   // Fetch trending movies for hero carousel
   useEffect(() => {
     const fetchTrending = async () => {
       try {
         const results = await getTrendingMovies("week");
-        setTrendingMovies(results);
+        setTrendingMovies(filterReleasedMovies(results));
       } catch (err) {
         console.error("Failed to fetch trending movies:", err);
       }
@@ -79,7 +129,21 @@ function App() {
     fetchTrending();
   }, []);
 
-  // Fetch movies based on search query (resets on new search)
+  // Fetch genres on mount and add special categories
+  useEffect(() => {
+    const fetchGenres = async () => {
+      const genreList = await getGenres();
+      // Add special categories at the beginning
+      const specialGenres: Genre[] = [
+        { id: SPECIAL_GENRES.ANIME, name: "Anime" },
+        { id: SPECIAL_GENRES.KDRAMA, name: "K-Drama" },
+      ];
+      setGenres([...specialGenres, ...genreList]);
+    };
+    fetchGenres();
+  }, []);
+
+  // Fetch movies based on search query or genre (resets on new search/genre)
   useEffect(() => {
     let isMounted = true;
 
@@ -93,11 +157,32 @@ function App() {
         let results: Movie[];
         if (debouncedSearch.trim()) {
           results = await searchMovies(debouncedSearch, 1);
+          // Filter by genre if one is selected
+          if (selectedGenre === SPECIAL_GENRES.ANIME) {
+            // Anime: Animation genre (16) + Japanese language
+            results = results.filter(
+              (m) => m.genre_ids.includes(16) && m.original_language === "ja"
+            );
+          } else if (selectedGenre === SPECIAL_GENRES.KDRAMA) {
+            // K-Drama: Drama genre (18) + Korean language
+            results = results.filter(
+              (m) => m.genre_ids.includes(18) && m.original_language === "ko"
+            );
+          } else if (selectedGenre) {
+            results = results.filter((m) => m.genre_ids.includes(selectedGenre));
+          }
+        } else if (selectedGenre === SPECIAL_GENRES.ANIME) {
+          results = await discoverAnime(1);
+        } else if (selectedGenre === SPECIAL_GENRES.KDRAMA) {
+          results = await discoverKDrama(1);
+        } else if (selectedGenre) {
+          results = await discoverMoviesByGenre(selectedGenre, 1);
         } else {
           results = await getPopularMovies(1);
         }
         if (isMounted) {
-          setMovies(results);
+          const filtered = filterReleasedMovies(results);
+          setMovies(filtered);
           setHasMore(results.length >= 20);
         }
       } catch (err) {
@@ -117,7 +202,7 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, [debouncedSearch]);
+  }, [debouncedSearch, selectedGenre]);
 
   // Load more movies function
   const loadMoreMovies = useCallback(async () => {
@@ -130,15 +215,34 @@ function App() {
       let results: Movie[];
       if (debouncedSearch.trim()) {
         results = await searchMovies(debouncedSearch, nextPage);
+        // Filter by genre if one is selected
+        if (selectedGenre === SPECIAL_GENRES.ANIME) {
+          results = results.filter(
+            (m) => m.genre_ids.includes(16) && m.original_language === "ja"
+          );
+        } else if (selectedGenre === SPECIAL_GENRES.KDRAMA) {
+          results = results.filter(
+            (m) => m.genre_ids.includes(18) && m.original_language === "ko"
+          );
+        } else if (selectedGenre) {
+          results = results.filter((m) => m.genre_ids.includes(selectedGenre));
+        }
+      } else if (selectedGenre === SPECIAL_GENRES.ANIME) {
+        results = await discoverAnime(nextPage);
+      } else if (selectedGenre === SPECIAL_GENRES.KDRAMA) {
+        results = await discoverKDrama(nextPage);
+      } else if (selectedGenre) {
+        results = await discoverMoviesByGenre(selectedGenre, nextPage);
       } else {
         results = await getPopularMovies(nextPage);
       }
 
-      if (results.length > 0) {
+      const filtered = filterReleasedMovies(results);
+      if (filtered.length > 0) {
         setMovies((prev) => {
           // Filter out duplicates
           const existingIds = new Set(prev.map((m) => m.id));
-          const newMovies = results.filter((m) => !existingIds.has(m.id));
+          const newMovies = filtered.filter((m) => !existingIds.has(m.id));
           return [...prev, ...newMovies];
         });
         setPage(nextPage);
@@ -151,7 +255,7 @@ function App() {
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, hasMore, page, debouncedSearch]);
+  }, [loadingMore, hasMore, page, debouncedSearch, selectedGenre]);
 
   // Intersection observer for infinite scroll
   useEffect(() => {
@@ -161,7 +265,7 @@ function App() {
           loadMoreMovies();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1, rootMargin: "200px" }
     );
 
     const currentRef = loadMoreRef.current;
@@ -209,22 +313,32 @@ function App() {
         <div className="max-w-[1800px] mx-auto flex items-center justify-between gap-4">
           {/* Logo */}
           <div className="flex items-center gap-8">
-            <h1 className="text-xl md:text-2xl font-bold gradient-text whitespace-nowrap">
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setSortBy("popularity");
+                setSelectedGenre(null);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="text-xl md:text-2xl font-bold gradient-text whitespace-nowrap hover:opacity-80 transition-opacity"
+            >
               MovieFinder
-            </h1>
+            </button>
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-1">
               {[
                 { value: "popularity" as SortOption, label: "Popular" },
-                { value: "rating" as SortOption, label: "Top Rated" },
                 { value: "release_date" as SortOption, label: "Latest" },
               ].map((option) => {
-                const isActive = sortBy === option.value;
+                const isActive = sortBy === option.value && !selectedGenre;
                 return (
                   <button
                     key={option.value}
-                    onClick={() => setSortBy(option.value)}
+                    onClick={() => {
+                      setSortBy(option.value);
+                      setSelectedGenre(null);
+                    }}
                     className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300"
                     style={{
                       background: isActive ? "var(--color-accent)" : "transparent",
@@ -235,6 +349,63 @@ function App() {
                   </button>
                 );
               })}
+
+              {/* Genre Dropdown */}
+              <div className="relative" ref={genreDropdownRef}>
+                <button
+                  onClick={() => setGenreDropdownOpen(!genreDropdownOpen)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center gap-2"
+                  style={{
+                    background: selectedGenre ? "var(--color-accent)" : "transparent",
+                    color: selectedGenre ? "#000" : "var(--color-text-muted)",
+                  }}
+                >
+                  {selectedGenre ? genres.find(g => g.id === selectedGenre)?.name : "Genre"}
+                  <svg
+                    className={`w-4 h-4 transition-transform ${genreDropdownOpen ? "rotate-180" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {genreDropdownOpen && (
+                  <div
+                    className="absolute top-full left-0 mt-2 py-2 rounded-lg min-w-[160px] max-h-[300px] overflow-y-auto z-50 scrollbar-thin"
+                    style={{
+                      background: "rgba(20, 20, 20, 0.95)",
+                      backdropFilter: "blur(12px)",
+                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+                    }}
+                  >
+                    <button
+                      onClick={() => {
+                        setSelectedGenre(null);
+                        setGenreDropdownOpen(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm transition-colors hover:bg-white/10"
+                      style={{ color: !selectedGenre ? "var(--color-accent)" : "var(--color-text)" }}
+                    >
+                      All Genres
+                    </button>
+                    {genres.map((genre) => (
+                      <button
+                        key={genre.id}
+                        onClick={() => {
+                          setSelectedGenre(genre.id);
+                          setGenreDropdownOpen(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm transition-colors hover:bg-white/10"
+                        style={{ color: selectedGenre === genre.id ? "var(--color-accent)" : "var(--color-text)" }}
+                      >
+                        {genre.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -285,18 +456,18 @@ function App() {
             </div>
 
             {/* Mobile Sort Options */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 mb-3">
               {[
                 { value: "popularity" as SortOption, label: "Popular" },
-                { value: "rating" as SortOption, label: "Top Rated" },
                 { value: "release_date" as SortOption, label: "Latest" },
               ].map((option) => {
-                const isActive = sortBy === option.value;
+                const isActive = sortBy === option.value && !selectedGenre;
                 return (
                   <button
                     key={option.value}
                     onClick={() => {
                       setSortBy(option.value);
+                      setSelectedGenre(null);
                       setMobileMenuOpen(false);
                     }}
                     className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all"
@@ -309,6 +480,65 @@ function App() {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Mobile Genre Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setGenreDropdownOpen(!genreDropdownOpen)}
+                className="w-full px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-between"
+                style={{
+                  background: selectedGenre ? "var(--color-accent)" : "rgba(255, 255, 255, 0.1)",
+                  color: selectedGenre ? "#000" : "var(--color-text-muted)",
+                }}
+              >
+                {selectedGenre ? genres.find(g => g.id === selectedGenre)?.name : "All Genres"}
+                <svg
+                  className={`w-4 h-4 transition-transform ${genreDropdownOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {genreDropdownOpen && (
+                <div
+                  className="absolute top-full left-0 right-0 mt-2 py-2 rounded-lg max-h-[250px] overflow-y-auto z-50 scrollbar-thin"
+                  style={{
+                    background: "rgba(20, 20, 20, 0.95)",
+                    backdropFilter: "blur(12px)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      setSelectedGenre(null);
+                      setGenreDropdownOpen(false);
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm transition-colors hover:bg-white/10"
+                    style={{ color: !selectedGenre ? "var(--color-accent)" : "var(--color-text)" }}
+                  >
+                    All Genres
+                  </button>
+                  {genres.map((genre) => (
+                    <button
+                      key={genre.id}
+                      onClick={() => {
+                        setSelectedGenre(genre.id);
+                        setGenreDropdownOpen(false);
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm transition-colors hover:bg-white/10"
+                      style={{ color: selectedGenre === genre.id ? "var(--color-accent)" : "var(--color-text)" }}
+                    >
+                      {genre.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
           </motion.div>
@@ -332,6 +562,7 @@ function App() {
           </div>
         )}
 
+
         {/* Movies Section */}
         <div className={`px-4 md:px-8 lg:px-16 ${searchQuery ? "pt-28 pb-12" : "pb-12"}`}>
           <div className="max-w-[1800px] mx-auto">
@@ -343,7 +574,13 @@ function App() {
                 className="mb-8"
               >
                 <h2 className="text-2xl md:text-3xl font-bold" style={{ color: "var(--color-text)" }}>
-                  {searchQuery ? `Search Results for "${searchQuery}"` : "Popular Movies"}
+                  {searchQuery
+                    ? selectedGenre
+                      ? `"${searchQuery}" in ${genres.find((g) => g.id === selectedGenre)?.name}`
+                      : `Search Results for "${searchQuery}"`
+                    : selectedGenre
+                      ? `${genres.find((g) => g.id === selectedGenre)?.name} Movies`
+                      : "Popular Movies"}
                 </h2>
               </motion.div>
             )}
@@ -451,11 +688,10 @@ function App() {
                 ) : (
                   <>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
-                      {sortedMovies.map((movie, index) => (
+                      {sortedMovies.map((movie) => (
                         <MovieCardWithAnimation
                           key={movie.id}
                           movie={movie}
-                          index={index}
                           onClick={setSelectedMovieId}
                         />
                       ))}
