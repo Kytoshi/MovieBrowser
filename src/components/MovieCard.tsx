@@ -96,29 +96,12 @@ export function MovieCard({ movie, onClick, className }: MovieCardProps) {
         >
           {movie.title}
         </h3>
-        <div className="flex items-center gap-3">
-          <span
+        <span
             className="text-sm font-medium"
             style={{ color: "var(--color-text-muted)" }}
           >
             {year}
           </span>
-          {movie.vote_count && (
-            <span
-              className="text-xs px-2 py-1 rounded-full font-semibold"
-              style={{
-                background: "rgba(212, 175, 55, 0.9)",
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-                boxShadow: "0 2px 8px rgba(212, 175, 55, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
-                color: "#000",
-              }}
-            >
-              {movie.vote_count} votes
-            </span>
-          )}
-        </div>
       </div>
     </motion.div>
   );

@@ -37,7 +37,7 @@ export function SearchBar({ value, onChange, placeholder = "Search for movies...
           placeholder={placeholder}
           className="modern-input pl-14 pr-24 h-14 text-base"
           style={{
-            background: isFocused ? 'white' : 'var(--color-surface)',
+            background: isFocused ? 'rgba(255, 255, 255, 0.03)' : 'var(--color-surface)',
             color: 'var(--color-text)',
           }}
         />

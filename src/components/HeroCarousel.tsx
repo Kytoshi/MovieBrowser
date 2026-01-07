@@ -65,7 +65,7 @@ export function HeroCarousel({
           <img
             src={getImageUrl(
               currentMovie.backdrop_path || currentMovie.poster_path,
-              "w1280"
+              "original"
             )}
             alt={currentMovie.title}
             className='w-full h-full object-cover object-top'
@@ -156,7 +156,7 @@ export function HeroCarousel({
                     viewBox='0 0 24 24'>
                     <path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z' />
                   </svg>
-                  View Details
+                  More Info
                 </button>
                 <button
                   onClick={() => onTrailerClick(currentMovie.id)}
@@ -238,7 +238,6 @@ export function HeroCarousel({
           />
         ))}
       </div>
-
     </div>
   );
 }
