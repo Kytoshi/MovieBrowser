@@ -126,12 +126,19 @@ function App() {
       );
   }, []);
 
-  // Fetch trending movies for hero carousel
+  // Fetch trending movies for hero carousel (only recent releases)
   useEffect(() => {
     const fetchTrending = async () => {
       try {
         const results = await getTrendingMovies("week");
-        setTrendingMovies(filterReleasedMovies(results));
+        // Filter to only show movies from the last 2 years for the hero
+        const twoYearsAgo = new Date();
+        twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+        const recentTrending = filterReleasedMovies(results).filter((movie) => {
+          if (!movie.release_date) return false;
+          return new Date(movie.release_date) >= twoYearsAgo;
+        });
+        setTrendingMovies(recentTrending);
       } catch (err) {
         console.error("Failed to fetch trending movies:", err);
       }

@@ -9,9 +9,37 @@ import type {
 } from "@/types/movie";
 
 // TMDB API Configuration
+// In production, use the proxy to hide the API key
+// In development, can use direct TMDB calls with VITE_TMDB_API_KEY
+const USE_PROXY = import.meta.env.PROD || !import.meta.env.VITE_TMDB_API_KEY;
 const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
-const BASE_URL = "https://api.themoviedb.org/3";
+const DIRECT_BASE_URL = "https://api.themoviedb.org/3";
+const PROXY_BASE_URL = "/api/tmdb";
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
+
+// Helper to build API URLs
+function buildApiUrl(
+  path: string,
+  params: Record<string, string | number> = {}
+): string {
+  if (USE_PROXY) {
+    const searchParams = new URLSearchParams({
+      path,
+      ...Object.fromEntries(
+        Object.entries(params).map(([k, v]) => [k, String(v)])
+      ),
+    });
+    return `${PROXY_BASE_URL}?${searchParams.toString()}`;
+  } else {
+    const searchParams = new URLSearchParams({
+      api_key: API_KEY,
+      ...Object.fromEntries(
+        Object.entries(params).map(([k, v]) => [k, String(v)])
+      ),
+    });
+    return `${DIRECT_BASE_URL}/${path}?${searchParams.toString()}`;
+  }
+}
 
 /**
  * Get the full URL for a movie poster or backdrop image
@@ -45,9 +73,11 @@ export async function searchMovies(
 
   try {
     const response = await fetch(
-      `${BASE_URL}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(
-        query
-      )}&page=${page}&include_adult=false`
+      buildApiUrl("search/movie", {
+        query: encodeURIComponent(query),
+        page,
+        include_adult: "false",
+      })
     );
 
     if (!response.ok) {
@@ -72,7 +102,7 @@ export async function searchMovies(
 export async function getPopularMovies(page: number = 1): Promise<Movie[]> {
   try {
     const response = await fetch(
-      `${BASE_URL}/movie/popular?api_key=${API_KEY}&page=${page}&include_adult=false`
+      buildApiUrl("movie/popular", { page, include_adult: "false" })
     );
 
     if (!response.ok) {
@@ -96,7 +126,7 @@ export async function getPopularMovies(page: number = 1): Promise<Movie[]> {
  */
 export async function getMovieDetails(id: number): Promise<MovieDetails> {
   try {
-    const response = await fetch(`${BASE_URL}/movie/${id}?api_key=${API_KEY}`);
+    const response = await fetch(buildApiUrl(`movie/${id}`));
 
     if (!response.ok) {
       throw new Error(`TMDB API error: ${response.status}`);
@@ -122,7 +152,7 @@ export async function getSimilarMovies(
 ): Promise<Movie[]> {
   try {
     const response = await fetch(
-      `${BASE_URL}/movie/${id}/similar?api_key=${API_KEY}&page=${page}&include_adult=false`
+      buildApiUrl(`movie/${id}/similar`, { page, include_adult: "false" })
     );
 
     if (!response.ok) {
@@ -146,9 +176,7 @@ export async function getWatchProviders(
   id: number
 ): Promise<WatchProviders | null> {
   try {
-    const response = await fetch(
-      `${BASE_URL}/movie/${id}/watch/providers?api_key=${API_KEY}`
-    );
+    const response = await fetch(buildApiUrl(`movie/${id}/watch/providers`));
 
     if (!response.ok) {
       throw new Error(`TMDB API error: ${response.status}`);
@@ -169,9 +197,7 @@ export async function getWatchProviders(
  */
 export async function getMovieVideos(id: number): Promise<MovieVideos | null> {
   try {
-    const response = await fetch(
-      `${BASE_URL}/movie/${id}/videos?api_key=${API_KEY}`
-    );
+    const response = await fetch(buildApiUrl(`movie/${id}/videos`));
 
     if (!response.ok) {
       throw new Error(`TMDB API error: ${response.status}`);
@@ -194,9 +220,7 @@ export async function getMovieCredits(
   id: number
 ): Promise<MovieCredits | null> {
   try {
-    const response = await fetch(
-      `${BASE_URL}/movie/${id}/credits?api_key=${API_KEY}`
-    );
+    const response = await fetch(buildApiUrl(`movie/${id}/credits`));
 
     if (!response.ok) {
       throw new Error(`TMDB API error: ${response.status}`);
@@ -220,7 +244,7 @@ export async function getTrendingMovies(
 ): Promise<Movie[]> {
   try {
     const response = await fetch(
-      `${BASE_URL}/trending/movie/${timeWindow}?api_key=${API_KEY}&include_adult=false`
+      buildApiUrl(`trending/movie/${timeWindow}`, { include_adult: "false" })
     );
 
     if (!response.ok) {
@@ -241,9 +265,7 @@ export async function getTrendingMovies(
  */
 export async function getGenres(): Promise<Genre[]> {
   try {
-    const response = await fetch(
-      `${BASE_URL}/genre/movie/list?api_key=${API_KEY}`
-    );
+    const response = await fetch(buildApiUrl("genre/movie/list"));
 
     if (!response.ok) {
       throw new Error(`TMDB API error: ${response.status}`);
@@ -269,7 +291,12 @@ export async function discoverMoviesByGenre(
 ): Promise<Movie[]> {
   try {
     const response = await fetch(
-      `${BASE_URL}/discover/movie?api_key=${API_KEY}&with_genres=${genreId}&page=${page}&sort_by=popularity.desc&include_adult=false`
+      buildApiUrl("discover/movie", {
+        with_genres: genreId,
+        page,
+        sort_by: "popularity.desc",
+        include_adult: "false",
+      })
     );
 
     if (!response.ok) {
@@ -291,9 +318,14 @@ export async function discoverMoviesByGenre(
  */
 export async function discoverAnime(page: number = 1): Promise<Movie[]> {
   try {
-    // Genre 16 = Animation, with_origin_country = JP (Japan)
     const response = await fetch(
-      `${BASE_URL}/discover/movie?api_key=${API_KEY}&with_genres=16&with_origin_country=JP&page=${page}&sort_by=popularity.desc&include_adult=false`
+      buildApiUrl("discover/movie", {
+        with_genres: 16,
+        with_origin_country: "JP",
+        page,
+        sort_by: "popularity.desc",
+        include_adult: "false",
+      })
     );
 
     if (!response.ok) {
@@ -315,9 +347,14 @@ export async function discoverAnime(page: number = 1): Promise<Movie[]> {
  */
 export async function discoverKDrama(page: number = 1): Promise<Movie[]> {
   try {
-    // Genre 18 = Drama, with_origin_country = KR (South Korea)
     const response = await fetch(
-      `${BASE_URL}/discover/movie?api_key=${API_KEY}&with_genres=18&with_origin_country=KR&page=${page}&sort_by=popularity.desc&include_adult=false`
+      buildApiUrl("discover/movie", {
+        with_genres: 18,
+        with_origin_country: "KR",
+        page,
+        sort_by: "popularity.desc",
+        include_adult: "false",
+      })
     );
 
     if (!response.ok) {
@@ -339,10 +376,15 @@ export async function discoverKDrama(page: number = 1): Promise<Movie[]> {
  */
 export async function getLatestMovies(page: number = 1): Promise<Movie[]> {
   try {
-    // Get today's date and format for API
     const today = new Date().toISOString().split("T")[0];
     const response = await fetch(
-      `${BASE_URL}/discover/movie?api_key=${API_KEY}&page=${page}&sort_by=primary_release_date.desc&primary_release_date.lte=${today}&vote_count.gte=10&include_adult=false`
+      buildApiUrl("discover/movie", {
+        page,
+        sort_by: "primary_release_date.desc",
+        "primary_release_date.lte": today,
+        "vote_count.gte": 10,
+        include_adult: "false",
+      })
     );
 
     if (!response.ok) {
