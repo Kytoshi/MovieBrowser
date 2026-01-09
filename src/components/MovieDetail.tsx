@@ -274,7 +274,7 @@ export function MovieDetail({ movieId, isOpen, onClose }: MovieDetailProps) {
                     <h3 className="text-lg font-semibold text-white mb-4">Top Cast</h3>
                     <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2">
                       {cast.map((member) => (
-                        <div key={member.id} className="flex-shrink-0 w-24 text-center">
+                        <div key={member.id} className="flex-shrink-0 w-28 text-center">
                           <div className="w-20 h-20 rounded-full overflow-hidden mx-auto mb-2 bg-white/10">
                             {member.profile_path ? (
                               <img
@@ -290,8 +290,8 @@ export function MovieDetail({ movieId, isOpen, onClose }: MovieDetailProps) {
                               </div>
                             )}
                           </div>
-                          <p className="text-white text-sm font-medium truncate">{member.name}</p>
-                          <p className="text-white/50 text-xs truncate">{member.character}</p>
+                          <p className="text-white text-sm font-medium line-clamp-2 leading-tight">{member.name}</p>
+                          <p className="text-white/50 text-xs truncate mt-1">{member.character}</p>
                         </div>
                       ))}
                     </div>
