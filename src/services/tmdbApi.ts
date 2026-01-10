@@ -17,6 +17,12 @@ const DIRECT_BASE_URL = "https://api.themoviedb.org/3";
 const PROXY_BASE_URL = "/api/tmdb";
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 
+// TMDB keyword IDs for adult/erotic content to exclude
+// 155477: erotic movie, 6054: erotic, 230183: softcore, 191736: sexploitation
+// 280411: erotic thriller, 10647: sex, 418209: softcore erotica
+// 245227: pinku eiga (Japanese erotic cinema), 156174: sexual content
+const EXCLUDED_KEYWORDS = "155477|6054|230183|191736|280411|10647|418209|245227|156174";
+
 // Helper to build API URLs
 function buildApiUrl(
   path: string,
@@ -61,7 +67,7 @@ export function getImageUrl(
  * Search for movies by title
  * @param query - Search query string
  * @param page - Page number for pagination
- * @returns Array of movies matching the search
+ * @returns Array of movies matching the search (filtered for adult content)
  */
 export async function searchMovies(
   query: string,
@@ -85,7 +91,10 @@ export async function searchMovies(
     }
 
     const data: MovieSearchResponse = await response.json();
-    return data.results;
+    // Filter out adult content and very low vote count movies
+    return data.results.filter(
+      (movie) => !movie.adult && movie.vote_count >= 10
+    );
   } catch (error) {
     console.error("Error searching movies:", error);
     throw new Error(
@@ -95,14 +104,22 @@ export async function searchMovies(
 }
 
 /**
- * Get popular movies
+ * Get popular movies (uses discover endpoint for better filtering)
  * @param page - Page number for pagination
  * @returns Array of popular movies
  */
 export async function getPopularMovies(page: number = 1): Promise<Movie[]> {
   try {
     const response = await fetch(
-      buildApiUrl("movie/popular", { page, include_adult: "false" })
+      buildApiUrl("discover/movie", {
+        page,
+        sort_by: "popularity.desc",
+        include_adult: "false",
+        "vote_count.gte": 100,
+        watch_region: "US",
+        with_watch_monetization_types: "flatrate|rent|buy",
+        without_keywords: EXCLUDED_KEYWORDS,
+      })
     );
 
     if (!response.ok) {
@@ -144,7 +161,7 @@ export async function getMovieDetails(id: number): Promise<MovieDetails> {
  * Get similar movies for a specific movie
  * @param id - Movie ID
  * @param page - Page number for pagination
- * @returns Array of similar movies
+ * @returns Array of similar movies (filtered for adult content)
  */
 export async function getSimilarMovies(
   id: number,
@@ -160,7 +177,10 @@ export async function getSimilarMovies(
     }
 
     const data: MovieSearchResponse = await response.json();
-    return data.results;
+    // Filter out adult content and movies with very low vote counts (often obscure adult films)
+    return data.results.filter(
+      (movie) => !movie.adult && movie.vote_count >= 50
+    );
   } catch (error) {
     console.error("Error fetching similar movies:", error);
     return [];
@@ -237,7 +257,7 @@ export async function getMovieCredits(
 /**
  * Get trending movies
  * @param timeWindow - 'day' or 'week'
- * @returns Array of trending movies
+ * @returns Array of trending movies (filtered for adult content)
  */
 export async function getTrendingMovies(
   timeWindow: "day" | "week" = "week"
@@ -252,7 +272,10 @@ export async function getTrendingMovies(
     }
 
     const data: MovieSearchResponse = await response.json();
-    return data.results;
+    // Filter out adult content and low-vote movies
+    return data.results.filter(
+      (movie) => !movie.adult && movie.vote_count >= 100
+    );
   } catch (error) {
     console.error("Error fetching trending movies:", error);
     throw new Error("Failed to fetch trending movies. Please try again.");
@@ -296,7 +319,10 @@ export async function discoverMoviesByGenre(
         page,
         sort_by: "popularity.desc",
         include_adult: "false",
-        "vote_count.gte": 10,
+        "vote_count.gte": 50,
+        watch_region: "US",
+        with_watch_monetization_types: "flatrate|rent|buy",
+        without_keywords: EXCLUDED_KEYWORDS,
       })
     );
 
@@ -326,7 +352,10 @@ export async function discoverAnime(page: number = 1): Promise<Movie[]> {
         page,
         sort_by: "popularity.desc",
         include_adult: "false",
-        "vote_count.gte": 10,
+        "vote_count.gte": 50,
+        watch_region: "US",
+        with_watch_monetization_types: "flatrate|rent|buy",
+        without_keywords: EXCLUDED_KEYWORDS,
       })
     );
 
@@ -356,7 +385,10 @@ export async function discoverKDrama(page: number = 1): Promise<Movie[]> {
         page,
         sort_by: "popularity.desc",
         include_adult: "false",
-        "vote_count.gte": 10,
+        "vote_count.gte": 50,
+        watch_region: "US",
+        with_watch_monetization_types: "flatrate|rent|buy",
+        without_keywords: EXCLUDED_KEYWORDS,
       })
     );
 
@@ -385,8 +417,11 @@ export async function getLatestMovies(page: number = 1): Promise<Movie[]> {
         page,
         sort_by: "primary_release_date.desc",
         "primary_release_date.lte": today,
-        "vote_count.gte": 10,
+        "vote_count.gte": 50,
         include_adult: "false",
+        watch_region: "US",
+        with_watch_monetization_types: "flatrate|rent|buy",
+        without_keywords: EXCLUDED_KEYWORDS,
       })
     );
 
