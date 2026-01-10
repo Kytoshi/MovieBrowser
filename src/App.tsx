@@ -24,12 +24,15 @@ const SPECIAL_GENRES = {
   KDRAMA: -2,
 };
 
-// Filter out movies that are planned/rumored or missing essential data
+// Filter out movies that are planned/rumored, missing essential data, or adult content
 function filterReleasedMovies(movies: Movie[]): Movie[] {
   const oneYearFromNow = new Date();
   oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
 
   return movies.filter((movie) => {
+    // Filter out adult content
+    if (movie.adult) return false;
+
     // Must have a poster image
     if (!movie.poster_path) return false;
 

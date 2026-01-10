@@ -296,6 +296,7 @@ export async function discoverMoviesByGenre(
         page,
         sort_by: "popularity.desc",
         include_adult: "false",
+        "vote_count.gte": 10,
       })
     );
 
@@ -325,6 +326,7 @@ export async function discoverAnime(page: number = 1): Promise<Movie[]> {
         page,
         sort_by: "popularity.desc",
         include_adult: "false",
+        "vote_count.gte": 10,
       })
     );
 
@@ -354,6 +356,7 @@ export async function discoverKDrama(page: number = 1): Promise<Movie[]> {
         page,
         sort_by: "popularity.desc",
         include_adult: "false",
+        "vote_count.gte": 10,
       })
     );
 
