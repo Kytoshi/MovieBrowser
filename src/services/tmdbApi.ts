@@ -91,9 +91,9 @@ export async function searchMovies(
     }
 
     const data: MovieSearchResponse = await response.json();
-    // Filter out adult content and very low vote count movies
+    // Filter out adult content and low vote count movies
     return data.results.filter(
-      (movie) => !movie.adult && movie.vote_count >= 10
+      (movie) => !movie.adult && movie.vote_count >= 50
     );
   } catch (error) {
     console.error("Error searching movies:", error);
