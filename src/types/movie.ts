@@ -29,6 +29,7 @@ export interface MovieDetails extends Movie {
   production_companies: ProductionCompany[];
   production_countries: ProductionCountry[];
   spoken_languages: SpokenLanguage[];
+  belongs_to_collection: MovieCollection | null;
 }
 
 export interface Genre {
@@ -64,6 +65,12 @@ export interface MovieSearchResponse {
 
 // Sort options for client-side filtering
 export type SortOption = 'popularity' | 'rating' | 'release_date';
+
+// TMDB API sort options for discover endpoint
+export type DiscoverSortOption = 'popularity' | 'release_date' | 'trending';
+
+// International drama region options
+export type InternationalRegion = 'all' | 'korean' | 'japanese' | 'filipino' | 'thai' | 'chinese' | 'french' | 'spanish' | 'british';
 
 // Watch Providers (Streaming availability)
 export interface WatchProvider {
@@ -125,4 +132,21 @@ export interface MovieCredits {
   id: number;
   cast: CastMember[];
   crew: CrewMember[];
+}
+
+// Movie Collection (Franchise)
+export interface MovieCollection {
+  id: number;
+  name: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+}
+
+export interface CollectionDetails {
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  parts: Movie[];
 }

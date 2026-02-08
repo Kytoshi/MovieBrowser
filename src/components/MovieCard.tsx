@@ -23,13 +23,27 @@ export function MovieCard({ movie, onClick, className }: MovieCardProps) {
     }
   };
 
+  // Variants for the card container
+  const cardVariants = {
+    initial: { y: 0 },
+    hover: { y: -2 },
+  };
+
+  // Variants for the description overlay with bounce effect
+  const descriptionVariants = {
+    initial: { y: "100%" },
+    hover: { y: 0 },
+  };
+
   return (
     <motion.div
       role="button"
       tabIndex={0}
-      whileHover={{ y: -2 }}
+      variants={cardVariants}
+      initial="initial"
+      whileHover="hover"
       whileTap={{ scale: 0.98 }}
-      transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+      transition={{ duration: 0.3 }}
       onClick={() => onClick(movie.id)}
       onKeyDown={handleKeyDown}
       className={`modern-card cursor-pointer group overflow-hidden ${
@@ -48,12 +62,9 @@ export function MovieCard({ movie, onClick, className }: MovieCardProps) {
           }}
         />
 
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
         {/* Rating Badge */}
         <div
-          className="absolute top-3 right-3 px-3 py-1.5 rounded-full flex items-center gap-1.5 font-semibold text-sm"
+          className="absolute top-3 right-3 px-3 py-1.5 rounded-full flex items-center gap-1.5 font-semibold text-sm z-10"
           style={{
             background: "rgba(212, 175, 55, 0.9)",
             backdropFilter: "blur(12px)",
@@ -69,23 +80,23 @@ export function MovieCard({ movie, onClick, className }: MovieCardProps) {
           {rating}
         </div>
 
-        {/* Play button overlay */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <div
-            className="w-14 h-14 rounded-full flex items-center justify-center"
-            style={{
-              background: "rgba(212, 175, 55, 0.9)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              border: "2px solid rgba(255, 255, 255, 0.2)",
-              boxShadow: "0 8px 32px rgba(212, 175, 55, 0.5), inset 0 2px 0 rgba(255, 255, 255, 0.3)",
-            }}
-          >
-            <svg className="w-6 h-6 ml-1" fill="#000" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </div>
-        </div>
+        {/* Hover overlay with gradient and description - slides up from bottom with bounce */}
+        <motion.div
+          className="absolute inset-x-0 -bottom-8 p-4 pt-32 pb-12 pointer-events-none"
+          variants={descriptionVariants}
+          transition={{
+            type: "spring",
+            stiffness: 200,
+            damping: 25,
+          }}
+          style={{
+            background: "linear-gradient(to top, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.95) 20%, rgba(0, 0, 0, 0.85) 50%, rgba(0, 0, 0, 0.5) 80%, transparent 100%)",
+          }}
+        >
+          <p className="text-white/90 text-sm leading-relaxed line-clamp-5">
+            {movie.overview || "No description available."}
+          </p>
+        </motion.div>
       </div>
 
       {/* Movie Info */}

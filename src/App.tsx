@@ -14,14 +14,15 @@ import {
   getGenres,
   discoverMoviesByGenre,
   discoverAnime,
-  discoverKDrama,
+  discoverInternationalDrama,
 } from "@/services/tmdbApi";
-import type { Movie, SortOption, Genre } from "@/types/movie";
+import { RegionSelector } from "@/components/RegionSelector";
+import type { Movie, SortOption, Genre, DiscoverSortOption, InternationalRegion } from "@/types/movie";
 
 // Special genre IDs for custom categories
 const SPECIAL_GENRES = {
   ANIME: -1,
-  KDRAMA: -2,
+  INTERNATIONAL: -2,
 };
 
 // Filter out movies that are planned/rumored, missing essential data, or adult content
@@ -85,6 +86,8 @@ function App() {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [selectedGenre, setSelectedGenre] = useState<number | null>(null);
   const [genreDropdownOpen, setGenreDropdownOpen] = useState(false);
+  const [categorySortBy, setCategorySortBy] = useState<DiscoverSortOption>("trending");
+  const [internationalRegion, setInternationalRegion] = useState<InternationalRegion>("all");
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const genreDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -129,25 +132,37 @@ function App() {
       );
   }, []);
 
-  // Fetch trending movies for hero carousel (only recent releases)
+  // Fetch hero movies based on selected genre/category (recent releases)
   useEffect(() => {
-    const fetchTrending = async () => {
+    const fetchHeroMovies = async () => {
       try {
-        const results = await getTrendingMovies("week");
-        // Filter to only show movies from the last 2 years for the hero
-        const twoYearsAgo = new Date();
-        twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-        const recentTrending = filterReleasedMovies(results).filter((movie) => {
-          if (!movie.release_date) return false;
-          return new Date(movie.release_date) >= twoYearsAgo;
-        });
-        setTrendingMovies(recentTrending);
+        let results: Movie[];
+
+        if (selectedGenre === SPECIAL_GENRES.ANIME) {
+          // Get recent anime releases
+          results = await discoverAnime(1, "release_date");
+        } else if (selectedGenre === SPECIAL_GENRES.INTERNATIONAL) {
+          // Get recent international drama releases for selected region
+          results = await discoverInternationalDrama(1, "release_date", internationalRegion);
+        } else if (selectedGenre) {
+          // Get recent releases in selected genre
+          results = await discoverMoviesByGenre(selectedGenre, 1, "release_date");
+        } else {
+          // Default: show trending movies (already recent by nature)
+          results = await getTrendingMovies("week");
+        }
+
+        // Filter to ensure quality hero content
+        const heroMovies = filterReleasedMovies(results);
+
+        // Take top 10 for hero carousel
+        setTrendingMovies(heroMovies.slice(0, 10));
       } catch (err) {
-        console.error("Failed to fetch trending movies:", err);
+        console.error("Failed to fetch hero movies:", err);
       }
     };
-    fetchTrending();
-  }, []);
+    fetchHeroMovies();
+  }, [selectedGenre, internationalRegion]);
 
   // Fetch genres on mount and add special categories
   useEffect(() => {
@@ -156,7 +171,7 @@ function App() {
       // Add special categories at the beginning
       const specialGenres: Genre[] = [
         { id: SPECIAL_GENRES.ANIME, name: "Anime" },
-        { id: SPECIAL_GENRES.KDRAMA, name: "K-Drama" },
+        { id: SPECIAL_GENRES.INTERNATIONAL, name: "International" },
       ];
       setGenres([...specialGenres, ...genreList]);
     };
@@ -183,10 +198,10 @@ function App() {
             results = results.filter(
               (m) => m.genre_ids.includes(16) && m.original_language === "ja"
             );
-          } else if (selectedGenre === SPECIAL_GENRES.KDRAMA) {
-            // K-Drama: Drama genre (18) + Korean language
+          } else if (selectedGenre === SPECIAL_GENRES.INTERNATIONAL) {
+            // International Drama: Drama genre (18) + non-US origin
             results = results.filter(
-              (m) => m.genre_ids.includes(18) && m.original_language === "ko"
+              (m) => m.genre_ids.includes(18) && m.original_language !== "en"
             );
           } else if (selectedGenre) {
             results = results.filter((m) =>
@@ -194,11 +209,11 @@ function App() {
             );
           }
         } else if (selectedGenre === SPECIAL_GENRES.ANIME) {
-          results = await discoverAnime(1);
-        } else if (selectedGenre === SPECIAL_GENRES.KDRAMA) {
-          results = await discoverKDrama(1);
+          results = await discoverAnime(1, categorySortBy);
+        } else if (selectedGenre === SPECIAL_GENRES.INTERNATIONAL) {
+          results = await discoverInternationalDrama(1, categorySortBy, internationalRegion);
         } else if (selectedGenre) {
-          results = await discoverMoviesByGenre(selectedGenre, 1);
+          results = await discoverMoviesByGenre(selectedGenre, 1, categorySortBy);
         } else if (sortBy === "release_date") {
           results = await getLatestMovies(1);
         } else {
@@ -207,7 +222,9 @@ function App() {
         if (isMounted) {
           const filtered = filterReleasedMovies(results);
           setMovies(filtered);
-          setHasMore(results.length >= 20);
+          // For international regions, use a lower threshold since API returns fewer results per page
+          const minResultsForMore = selectedGenre === SPECIAL_GENRES.INTERNATIONAL ? 5 : 20;
+          setHasMore(results.length >= minResultsForMore);
         }
       } catch (err) {
         if (isMounted) {
@@ -226,7 +243,7 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, [debouncedSearch, selectedGenre, sortBy]);
+  }, [debouncedSearch, selectedGenre, sortBy, categorySortBy, internationalRegion]);
 
   // Load more movies function
   const loadMoreMovies = useCallback(async () => {
@@ -244,19 +261,19 @@ function App() {
           results = results.filter(
             (m) => m.genre_ids.includes(16) && m.original_language === "ja"
           );
-        } else if (selectedGenre === SPECIAL_GENRES.KDRAMA) {
+        } else if (selectedGenre === SPECIAL_GENRES.INTERNATIONAL) {
           results = results.filter(
-            (m) => m.genre_ids.includes(18) && m.original_language === "ko"
+            (m) => m.genre_ids.includes(18) && m.original_language !== "en"
           );
         } else if (selectedGenre) {
           results = results.filter((m) => m.genre_ids.includes(selectedGenre));
         }
       } else if (selectedGenre === SPECIAL_GENRES.ANIME) {
-        results = await discoverAnime(nextPage);
-      } else if (selectedGenre === SPECIAL_GENRES.KDRAMA) {
-        results = await discoverKDrama(nextPage);
+        results = await discoverAnime(nextPage, categorySortBy);
+      } else if (selectedGenre === SPECIAL_GENRES.INTERNATIONAL) {
+        results = await discoverInternationalDrama(nextPage, categorySortBy, internationalRegion);
       } else if (selectedGenre) {
-        results = await discoverMoviesByGenre(selectedGenre, nextPage);
+        results = await discoverMoviesByGenre(selectedGenre, nextPage, categorySortBy);
       } else if (sortBy === "release_date") {
         results = await getLatestMovies(nextPage);
       } else {
@@ -272,7 +289,9 @@ function App() {
           return [...prev, ...newMovies];
         });
         setPage(nextPage);
-        setHasMore(results.length >= 20);
+        // For international regions, use a lower threshold since API returns fewer results per page
+        const minResultsForMore = selectedGenre === SPECIAL_GENRES.INTERNATIONAL ? 5 : 20;
+        setHasMore(results.length >= minResultsForMore);
       } else {
         setHasMore(false);
       }
@@ -281,7 +300,7 @@ function App() {
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, hasMore, page, debouncedSearch, selectedGenre, sortBy]);
+  }, [loadingMore, hasMore, page, debouncedSearch, selectedGenre, sortBy, categorySortBy, internationalRegion]);
 
   // Intersection observer for infinite scroll
   useEffect(() => {
@@ -306,23 +325,30 @@ function App() {
     };
   }, [hasMore, loading, loadingMore, loadMoreMovies]);
 
-  // Sort movies with memoization
+  // Movies are already sorted by the API, so we just use them directly
+  // Only apply client-side sorting for search results with genre filter
   const sortedMovies = useMemo(() => {
-    return [...movies].sort((a, b) => {
-      switch (sortBy) {
-        case "rating":
-          return b.vote_average - a.vote_average;
-        case "release_date": {
-          const dateA = a.release_date ? new Date(a.release_date).getTime() : 0;
-          const dateB = b.release_date ? new Date(b.release_date).getTime() : 0;
-          return dateB - dateA;
+    // If we have a search query with a genre filter, we need to sort client-side
+    // because the search API doesn't support genre filtering, so we filter after
+    if (debouncedSearch.trim() && selectedGenre) {
+      return [...movies].sort((a, b) => {
+        switch (sortBy) {
+          case "rating":
+            return b.vote_average - a.vote_average;
+          case "release_date": {
+            const dateA = a.release_date ? new Date(a.release_date).getTime() : 0;
+            const dateB = b.release_date ? new Date(b.release_date).getTime() : 0;
+            return dateB - dateA;
+          }
+          case "popularity":
+          default:
+            return b.popularity - a.popularity;
         }
-        case "popularity":
-        default:
-          return b.popularity - a.popularity;
-      }
-    });
-  }, [movies, sortBy]);
+      });
+    }
+    // For all other cases, the API returns movies in the correct order
+    return movies;
+  }, [movies, sortBy, debouncedSearch, selectedGenre]);
 
   return (
     <div className='min-h-screen'>
@@ -345,6 +371,8 @@ function App() {
                 setSearchQuery("");
                 setSortBy("popularity");
                 setSelectedGenre(null);
+                setCategorySortBy("trending");
+                setInternationalRegion("all");
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
               className='text-xl md:text-2xl font-bold gradient-text whitespace-nowrap hover:opacity-80 transition-opacity'>
@@ -418,6 +446,7 @@ function App() {
                     <button
                       onClick={() => {
                         setSelectedGenre(null);
+                        setCategorySortBy("trending");
                         setGenreDropdownOpen(false);
                       }}
                       className='w-full px-4 py-2 text-left text-sm transition-colors hover:bg-white/10'
@@ -433,6 +462,10 @@ function App() {
                         key={genre.id}
                         onClick={() => {
                           setSelectedGenre(genre.id);
+                          setCategorySortBy("trending");
+                          if (genre.id === SPECIAL_GENRES.INTERNATIONAL) {
+                            setInternationalRegion("all");
+                          }
                           setGenreDropdownOpen(false);
                         }}
                         className='w-full px-4 py-2 text-left text-sm transition-colors hover:bg-white/10'
@@ -577,6 +610,7 @@ function App() {
                   <button
                     onClick={() => {
                       setSelectedGenre(null);
+                      setCategorySortBy("trending");
                       setGenreDropdownOpen(false);
                       setMobileMenuOpen(false);
                     }}
@@ -593,6 +627,10 @@ function App() {
                       key={genre.id}
                       onClick={() => {
                         setSelectedGenre(genre.id);
+                        setCategorySortBy("trending");
+                        if (genre.id === SPECIAL_GENRES.INTERNATIONAL) {
+                          setInternationalRegion("all");
+                        }
                         setGenreDropdownOpen(false);
                         setMobileMenuOpen(false);
                       }}
@@ -615,7 +653,7 @@ function App() {
 
       {/* Main Content Area */}
       <main>
-        {/* Hero Carousel - Only show when not searching */}
+        {/* Hero Carousel - Shows category-relevant movies, hidden when searching */}
         {!searchQuery && trendingMovies.length > 0 && (
           <div className='relative'>
             {/* Subtle gradient at top for contrast behind nav */}
@@ -645,24 +683,70 @@ function App() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className='mb-8'>
-                <h2
-                  className='text-2xl md:text-3xl font-bold'
-                  style={{ color: "var(--color-text)" }}>
-                  {searchQuery
-                    ? selectedGenre
-                      ? `"${searchQuery}" in ${
+                className='mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4'>
+                {/* Show RegionSelector dropdown for International category */}
+                {selectedGenre === SPECIAL_GENRES.INTERNATIONAL && !searchQuery ? (
+                  <RegionSelector
+                    value={internationalRegion}
+                    onChange={setInternationalRegion}
+                  />
+                ) : (
+                  <h2
+                    className='text-2xl md:text-3xl font-bold'
+                    style={{ color: "var(--color-text)" }}>
+                    {searchQuery
+                      ? selectedGenre
+                        ? `"${searchQuery}" in ${
+                            genres.find((g) => g.id === selectedGenre)?.name
+                          }`
+                        : `Search Results for "${searchQuery}"`
+                      : selectedGenre
+                      ? `${
                           genres.find((g) => g.id === selectedGenre)?.name
-                        }`
-                      : `Search Results for "${searchQuery}"`
-                    : selectedGenre
-                    ? `${
-                        genres.find((g) => g.id === selectedGenre)?.name
-                      } Movies`
-                    : sortBy === "release_date"
-                    ? "Recent Releases"
-                    : "Popular Movies"}
-                </h2>
+                        } Movies`
+                      : sortBy === "release_date"
+                      ? "Recent Releases"
+                      : "Popular Movies"}
+                  </h2>
+                )}
+
+                {/* Category Sort Toggle - only show when genre is selected */}
+                {selectedGenre && !searchQuery && (
+                  <div className='flex items-center gap-2'>
+                    <span className='text-sm' style={{ color: "var(--color-text-muted)" }}>
+                      Sort by:
+                    </span>
+                    <div className='flex rounded-lg overflow-hidden' style={{ background: "rgba(255, 255, 255, 0.1)" }}>
+                      <button
+                        onClick={() => setCategorySortBy("trending")}
+                        className='px-3 py-1.5 text-sm font-medium transition-all'
+                        style={{
+                          background: categorySortBy === "trending" ? "var(--color-accent)" : "transparent",
+                          color: categorySortBy === "trending" ? "#000" : "var(--color-text-muted)",
+                        }}>
+                        Trending
+                      </button>
+                      <button
+                        onClick={() => setCategorySortBy("popularity")}
+                        className='px-3 py-1.5 text-sm font-medium transition-all'
+                        style={{
+                          background: categorySortBy === "popularity" ? "var(--color-accent)" : "transparent",
+                          color: categorySortBy === "popularity" ? "#000" : "var(--color-text-muted)",
+                        }}>
+                        Popular
+                      </button>
+                      <button
+                        onClick={() => setCategorySortBy("release_date")}
+                        className='px-3 py-1.5 text-sm font-medium transition-all'
+                        style={{
+                          background: categorySortBy === "release_date" ? "var(--color-accent)" : "transparent",
+                          color: categorySortBy === "release_date" ? "#000" : "var(--color-text-muted)",
+                        }}>
+                        Recent
+                      </button>
+                    </div>
+                  </div>
+                )}
               </motion.div>
             )}
 

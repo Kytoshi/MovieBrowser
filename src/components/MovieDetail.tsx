@@ -7,8 +7,8 @@ import {
   DialogTitle,
   DialogHiddenDescription,
 } from "@/components/ui/dialog";
-import type { MovieDetails, Movie, WatchProviderRegion, MovieVideo, CastMember, CrewMember } from "@/types/movie";
-import { getMovieDetails, getImageUrl, getSimilarMovies, getWatchProviders, getMovieVideos, getMovieCredits } from "@/services/tmdbApi";
+import type { MovieDetails, Movie, WatchProviderRegion, MovieVideo, CastMember, CrewMember, CollectionDetails } from "@/types/movie";
+import { getMovieDetails, getImageUrl, getSimilarMovies, getWatchProviders, getMovieVideos, getMovieCredits, getCollectionDetails } from "@/services/tmdbApi";
 
 interface MovieDetailProps {
   movieId: number | null;
@@ -19,6 +19,8 @@ interface MovieDetailProps {
 export function MovieDetail({ movieId, isOpen, onClose }: MovieDetailProps) {
   const [movie, setMovie] = useState<MovieDetails | null>(null);
   const [similarMovies, setSimilarMovies] = useState<Movie[]>([]);
+  const [collectionMovies, setCollectionMovies] = useState<Movie[]>([]);
+  const [collectionName, setCollectionName] = useState<string | null>(null);
   const [watchProviders, setWatchProviders] = useState<WatchProviderRegion | null>(null);
   const [trailer, setTrailer] = useState<MovieVideo | null>(null);
   const [cast, setCast] = useState<CastMember[]>([]);
@@ -34,6 +36,8 @@ export function MovieDetail({ movieId, isOpen, onClose }: MovieDetailProps) {
       setLoading(true);
       setError(null);
       setShowTrailer(false);
+      setCollectionMovies([]);
+      setCollectionName(null);
 
       try {
         // Fetch all data in parallel
@@ -47,6 +51,23 @@ export function MovieDetail({ movieId, isOpen, onClose }: MovieDetailProps) {
 
         setMovie(movieData);
         setSimilarMovies(similar.slice(0, 10));
+
+        // Fetch collection if movie belongs to one
+        if (movieData.belongs_to_collection) {
+          const collection = await getCollectionDetails(movieData.belongs_to_collection.id);
+          if (collection) {
+            // Filter out current movie and sort by release date
+            const otherMovies = collection.parts
+              .filter((m) => m.id !== movieId)
+              .sort((a, b) => {
+                const dateA = a.release_date ? new Date(a.release_date).getTime() : 0;
+                const dateB = b.release_date ? new Date(b.release_date).getTime() : 0;
+                return dateA - dateB;
+              });
+            setCollectionMovies(otherMovies);
+            setCollectionName(collection.name);
+          }
+        }
 
         // Get US watch providers
         if (providers?.results?.US) {
@@ -400,6 +421,59 @@ export function MovieDetail({ movieId, isOpen, onClose }: MovieDetailProps) {
                         </p>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Collection / Franchise Movies */}
+                {collectionMovies.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-4">
+                      More From {collectionName || "This Series"}
+                    </h3>
+                    <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 scrollbar-thin">
+                      {collectionMovies.map((collectionMovie) => (
+                        <div
+                          key={collectionMovie.id}
+                          onClick={() => handleSimilarMovieClick(collectionMovie.id)}
+                          className="flex-shrink-0 w-32 cursor-pointer group"
+                        >
+                          <div className="relative overflow-hidden rounded-xl mb-2">
+                            <img
+                              src={getImageUrl(collectionMovie.poster_path, "w300")}
+                              alt={collectionMovie.title}
+                              className="w-full aspect-[2/3] object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-300 flex items-center justify-center">
+                              <svg
+                                className="w-10 h-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                                fill="var(--color-accent)"
+                                viewBox="0 0 24 24"
+                              >
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+                              </svg>
+                            </div>
+                            {/* Rating Badge */}
+                            {collectionMovie.vote_average > 0 && (
+                              <div
+                                className="absolute top-2 right-2 px-2 py-1 rounded-md text-xs font-bold"
+                                style={{
+                                  background: "rgba(212, 175, 55, 0.9)",
+                                  color: "#000",
+                                }}
+                              >
+                                {collectionMovie.vote_average.toFixed(1)}
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-white text-sm font-medium truncate">
+                            {collectionMovie.title}
+                          </p>
+                          <p className="text-white/50 text-xs">
+                            {collectionMovie.release_date ? new Date(collectionMovie.release_date).getFullYear() : "TBA"}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
